@@ -1,0 +1,33 @@
+{
+  "name": "@ticketing/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./enums": {
+      "types": "./src/enums.ts",
+      "default": "./src/enums.ts"
+    },
+    "./schemas/event": {
+      "types": "./src/schemas/event.ts",
+      "default": "./src/schemas/event.ts"
+    },
+    "./schemas/order": {
+      "types": "./src/schemas/order.ts",
+      "default": "./src/schemas/order.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
