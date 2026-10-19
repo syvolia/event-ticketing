@@ -1,23 +1,36 @@
+# Production-shaped local stack. Invoke with:
+#
+#   docker compose -p ticketing-prod --env-file .env.prod -f docker-compose.prod.yml up
+#
+# The `-p ticketing-prod` is not optional. Without it, Docker uses the
+# directory name (`ticketing-platform`) as the project, which is the same
+# project the dev stack uses — so `docker compose down` on one would kill the
+# other, and volumes/networks would be shared.
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: ticketing-db-prod
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5454:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 30
 
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    container_name: ticketing-api-prod
     restart: unless-stopped
     depends_on:
       db:
@@ -25,20 +38,27 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL}
-      MPESA_ENV: ${MPESA_ENV}
-      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
-      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
-      MPESA_SHORTCODE: ${MPESA_SHORTCODE}
-      MPESA_PASSKEY: ${MPESA_PASSKEY}
-      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_FROM: ${SMTP_FROM}
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-10}
+      INVENTORY_IMPL: ${INVENTORY_IMPL:-conditional}
+      PG_POOL_MAX: ${PG_POOL_MAX:-20}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      MPESA_ENV: ${MPESA_ENV:-sandbox}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-174379}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_FROM: ${SMTP_FROM:-Ticketing <noreply@ticketing.local>}
     ports:
       - "3000:3000"
 
@@ -48,6 +68,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: ${PUBLIC_API_URL}
+    container_name: ticketing-web-prod
     restart: unless-stopped
     depends_on:
       - api
@@ -55,4 +76,4 @@ services:
       - "8080:80"
 
 volumes:
-  pgdata:
+  pgdata_prod:
