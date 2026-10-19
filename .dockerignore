@@ -1,0 +1,47 @@
+# Build context filter. Docker sends everything in the project directory to
+# the daemon unless matched here. The daemon then hashes files during COPY
+# to compute cache keys — and if a hashed file is a broken symlink, the COPY
+# fails with "failed to compute cache key".
+#
+# node_modules is the primary offender. It is reinstalled inside the image
+# by the deps stage (`npm ci`), so there is zero reason to send it across.
+# It also contains workspace symlinks that can point to moved/deleted paths,
+# which is exactly the failure we are fixing here.
+
+# Dependencies — reinstalled in the image
+**/node_modules
+
+# Build outputs
+**/dist
+**/.vite
+**/*.tsbuildinfo
+
+# Env files — never bake secrets into images
+.env
+.env.*
+!.env.example
+
+# Local dev artifacts
+**/.pgdata
+**/.cert
+*.log
+coverage
+
+# Git history — irrelevant for build, and .git can contain refs to
+# unreachable objects (e.g. after gc or after a partial clone) that break
+# BuildKit's hashing
+.git
+.gitignore
+
+# Editors
+**/.DS_Store
+**/.idea
+**/.vscode
+
+# Docs and screenshots
+docs
+*.md
+!README.md
+
+# Test artifacts
+apps/api/test-results
