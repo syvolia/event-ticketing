@@ -10,13 +10,10 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci --workspace=@ticketing/api --include-workspace-root
-
 RUN mkdir -p apps/api/node_modules packages/shared/node_modules
 
 # ---------------------------------------------------------------------------
-# Stage 2: build — typecheck only. tsx runs TypeScript at runtime, so there
-# is no JS emit step. `npm run typecheck` requires package.json to resolve
-# the workspace, exactly like the web Dockerfile's `npm run build`.
+# Stage 2: build — typecheck only.
 # ---------------------------------------------------------------------------
 FROM node:20-alpine AS build
 WORKDIR /app
@@ -27,16 +24,24 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 
 COPY package.json package-lock.json tsconfig.base.json ./
 
-COPY packages/shared ./packages/shared
-COPY apps/api ./apps/api
+# Explicitly copy only the source directories to avoid hashing node_modules
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/shared/tsconfig.json ./packages/shared/tsconfig.json
+COPY packages/shared/src ./packages/shared/src
 
-RUN ls -la /app/ | head -20 && test -f /app/package.json || \
-    (echo "FATAL: /app/package.json missing — COPY didn't land" && exit 1)
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/api/tsconfig.json ./apps/api/tsconfig.json
+COPY apps/api/src ./apps/api/src
+COPY apps/api/test ./apps/api/test
+
+RUN ls -la /app/apps/api && test -f /app/apps/api/src/index.ts \
+    && test -f /app/package.json \
+    || (echo "FATAL: expected files missing at /app" && exit 1)
 
 RUN npm run typecheck --workspace=@ticketing/api
 
 # ---------------------------------------------------------------------------
-# Stage 3: runtime — minimal image, non-root user, tini as PID 1.
+# Stage 3: runtime
 # ---------------------------------------------------------------------------
 FROM node:20-alpine AS runtime
 WORKDIR /app
