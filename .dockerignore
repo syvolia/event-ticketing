@@ -1,14 +1,15 @@
-# Build context filter. Docker sends everything in the project directory to
-# the daemon unless matched here. The daemon then hashes files during COPY
-# to compute cache keys — and if a hashed file is a broken symlink, the COPY
-# fails with "failed to compute cache key".
+# Build context filter. Everything matched here is excluded from the context
+# tarball that Docker sends to the daemon, and therefore from any COPY source.
 #
-# node_modules is the primary offender. It is reinstalled inside the image
-# by the deps stage (`npm ci`), so there is zero reason to send it across.
-# It also contains workspace symlinks that can point to moved/deleted paths,
-# which is exactly the failure we are fixing here.
+# The load-bearing line is `**/node_modules`. Without it, BuildKit tries to
+# hash every file inside apps/api/node_modules during `COPY apps/api ./apps/api`.
+# That directory contains npm workspace symlinks (e.g. @ticketing/shared →
+# ../../packages/shared), and if any link in the tree is broken, the hash
+# computation aborts with the misleading error
+#   failed to compute cache key: ".../apps/api": not found
+# The directory does exist; the file-walk failed.
 
-# Dependencies — reinstalled in the image
+# Dependencies — reinstalled inside the image by the deps stage
 **/node_modules
 
 # Build outputs
@@ -27,9 +28,8 @@
 *.log
 coverage
 
-# Git history — irrelevant for build, and .git can contain refs to
-# unreachable objects (e.g. after gc or after a partial clone) that break
-# BuildKit's hashing
+# Git history — irrelevant for build, and .git can hold refs BuildKit cannot
+# resolve cleanly (partial clones, gc)
 .git
 .gitignore
 
